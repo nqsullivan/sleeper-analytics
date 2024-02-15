@@ -4,8 +4,11 @@ import numpy as np
 import pandas as pd
 import requests
 import matplotlib.pyplot as plt
+import argparse
 
-LEAGUE_ID = '999090624546623488'
+parser = argparse.ArgumentParser(description="Analyze and visualize data from the Sleeper fantasy football platform")
+parser.add_argument('league_id', type=str, help='The league id to analyze')
+LEAGUE_ID = parser.parse_args().league_id
 
 global matchup_data, player_data, roster_data
 matchup_data = pd.DataFrame()
@@ -344,6 +347,11 @@ def visualize_data():
 
 
 def main():
+
+    if not LEAGUE_ID:
+        print("Please provide a league id")
+        return
+
     global matchup_data, player_data, roster_data
     player_data = get_player_data()
     roster_data = get_roster_data()
