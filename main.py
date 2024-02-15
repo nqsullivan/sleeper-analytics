@@ -53,7 +53,12 @@ def get_matchup_data():
 
     matchup_data = pd.DataFrame()
 
-    for week in range(1, current_week + 1):
+    if current_week == 0:
+        r = range(1, 17)
+    else:
+        r = range(1, current_week + 1)
+
+    for week in r:
         # Make a request to https://api.sleeper.app/v1/league/<league_id>/matchups/<week>
         req = requests.get('https://api.sleeper.app/v1/league/' + LEAGUE_ID + '/matchups/' + str(week))
 
@@ -110,7 +115,6 @@ def get_optimal_roster_from_matchup(matchup_data_temp):
             roster_for_week.loc[idx, 'points'] = matchup['players_points'].get(player_id, 0)
 
     # Sort the roster by points
-    print(roster_for_week)
     roster_for_week = roster_for_week.sort_values(by=['points'], ascending=False)
 
     # Get the top 1 QB, 2 RB, 2 WR, 1 TE, 1 FLEX, 1 SUPERFLEX, 1 DST, 1 K
@@ -299,8 +303,6 @@ def visualize_data():
     # Get the current week
     req = requests.get('https://api.sleeper.app/v1/state/nfl')
     current_week = req.json()['week']
-
-    print('Current Week: ' + str(current_week))
 
     # Create a figure and axis for the plot
     fig, ax = plt.subplots()
