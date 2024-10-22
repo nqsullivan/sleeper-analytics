@@ -370,6 +370,8 @@ def calculate_worst_10_efficiency_weeks():
     # Extract the year from the league metadata ('season' field)
     league_year = league_info.get('season', 'Unknown')
 
+    league_name = league_info.get('name', 'Unknown')
+
     # Create a list to store data for all weeks that will be converted into a DataFrame
     all_efficiency_data = []
 
@@ -399,6 +401,7 @@ def calculate_worst_10_efficiency_weeks():
                 # Append the data to the list, including the year
                 all_efficiency_data.append({
                     'Team': manager['owner_id'],
+                    'Name': league_name,
                     'Week': week,
                     'Year': league_year,  # Add the league year to the data
                     'Max PF': max_pf,
@@ -434,6 +437,8 @@ def calculate_worst_10_weeks():
     # Extract the year from the league metadata ('season' field)
     league_year = league_info.get('season', 'Unknown')
 
+    league_name = league_info.get('name', 'Unknown')
+
     # Create a list to store data for all weeks that will be converted into a DataFrame
     all_data = []
 
@@ -452,6 +457,7 @@ def calculate_worst_10_weeks():
                 # Append the data to the list, including the year
                 all_data.append({
                     'Team': manager['owner_id'],
+                    'Name': league_name,
                     'Week': week,
                     'Year': league_year,  # Add the league year to the data
                     'Actual PF': actual_pf,
@@ -481,6 +487,8 @@ def calculate_best_10_weeks():
     # Extract the year from the league metadata ('season' field)
     league_year = league_info.get('season', 'Unknown')
 
+    league_name = league_info.get('name', 'Unknown')
+
     # Create a list to store data for all weeks that will be converted into a DataFrame
     all_data = []
 
@@ -499,6 +507,7 @@ def calculate_best_10_weeks():
                 # Append the data to the list, including the year
                 all_data.append({
                     'Team': manager['owner_id'],
+                    'Name': league_name,
                     'Week': week,
                     'Year': league_year,  # Add the league year to the data
                     'Actual PF': actual_pf,
@@ -525,6 +534,8 @@ def main():
         print("Please provide a league id")
         return
 
+    combined_team_stats = pd.DataFrame()
+
     top_10_worst_efficiency_weeks = []
     top_10_worst_weeks = []
     top_10_best_weeks = []
@@ -532,29 +543,68 @@ def main():
     for LEAGUE_ID in LEAGUE_IDS:
         print(f"Analyzing league {LEAGUE_ID}")
 
+        # Reload global data for each league
         global matchup_data, player_data, roster_data
         player_data = get_player_data()
         roster_data = get_roster_data()
         matchup_data = get_matchup_data()
 
-        calculate_analytics()
+        # Concatenate stats from each league
+        combined_team_stats = pd.concat([combined_team_stats, calculate_analytics()])
+
+        # Collect top 10 weeks data
         top_10_worst_efficiency_weeks.append(calculate_worst_10_efficiency_weeks())
         top_10_worst_weeks.append(calculate_worst_10_weeks())
         top_10_best_weeks.append(calculate_best_10_weeks())
-        # visualize_data()
+        # visualize_data() # You can uncomment this if visualization is needed
 
-    combined_worst_efficiency_weeks = pd.concat(top_10_worst_efficiency_weeks)
-    combined_worst_efficiency_weeks = combined_worst_efficiency_weeks.sort_values(by='Efficiency', ascending=True)
-    combined_worst_efficiency_weeks = combined_worst_efficiency_weeks.head(10)
+    # After processing all leagues, group by owner_id to avoid duplication across leagues
+    combined_team_stats = combined_team_stats.groupby('owner_id', as_index=False).agg({
+        'wins': 'sum',
+        'losses': 'sum',
+        'points_for': 'sum',
+        'points_against': 'sum',
+        'optimal_points_for': 'sum',
+        'optimal_points_against': 'sum',
+        'points_difference': 'sum'
+    })
 
-    combined_worst_weeks = pd.concat(top_10_worst_weeks)
-    combined_worst_weeks = combined_worst_weeks.sort_values(by='Actual PF', ascending=True)
-    combined_worst_weeks = combined_worst_weeks.head(10)
+    combined_team_stats['win_percentage'] = combined_team_stats['wins'] / (combined_team_stats['wins'] + combined_team_stats['losses'])
+    combined_team_stats['average_points_for'] = combined_team_stats['points_for'] / (combined_team_stats['wins'] + combined_team_stats['losses'])
+    combined_team_stats['average_points_against'] = combined_team_stats['points_against'] / (combined_team_stats['wins'] + combined_team_stats['losses'])
+    combined_team_stats['efficiency_for'] = combined_team_stats['points_for'] / combined_team_stats['optimal_points_for']
+    combined_team_stats['efficiency_against'] = combined_team_stats['points_against'] / combined_team_stats['optimal_points_against']
 
-    combined_best_weeks = pd.concat(top_10_best_weeks)
-    combined_best_weeks = combined_best_weeks.sort_values(by='Actual PF', ascending=False)
-    combined_best_weeks = combined_best_weeks.head(10)
+    combined_team_stats = combined_team_stats.sort_values(by=['points_difference'], ascending=False)
 
+    # Recalculate aggregated metrics after combining all leagues
+    combined_team_stats['win_percentage'] = (combined_team_stats['wins'] / 
+                                             (combined_team_stats['wins'] + combined_team_stats['losses'])).map(lambda x: "{:.2%}".format(x))
+
+    combined_team_stats['average_points_for'] = (combined_team_stats['points_for'] / 
+                                                 (combined_team_stats['wins'] + combined_team_stats['losses'])).round(2)
+
+    combined_team_stats['average_points_against'] = (combined_team_stats['points_against'] / 
+                                                     (combined_team_stats['wins'] + combined_team_stats['losses'])).round(2)
+
+    combined_team_stats['efficiency_for'] = (combined_team_stats['points_for'] / 
+                                             combined_team_stats['optimal_points_for']).map(lambda x: "{:.2%}".format(x))
+
+    combined_team_stats['efficiency_against'] = (combined_team_stats['points_against'] / 
+                                                 combined_team_stats['optimal_points_against']).map(lambda x: "{:.2%}".format(x))
+
+    # Sort combined team stats by points_difference
+    combined_team_stats = combined_team_stats.sort_values(by=['points_difference'], ascending=False).reset_index(drop=True)
+
+    # Process top 10 worst and best weeks across all leagues
+    combined_worst_efficiency_weeks = pd.concat(top_10_worst_efficiency_weeks).sort_values(by='Efficiency', ascending=True).head(10)
+    combined_worst_weeks = pd.concat(top_10_worst_weeks).sort_values(by='Actual PF', ascending=True).head(10)
+    combined_best_weeks = pd.concat(top_10_best_weeks).sort_values(by='Actual PF', ascending=False).head(10)
+
+    # Display the results
+    print()
+    print("Combined team stats")
+    print(combined_team_stats)
     print()
     print("Top 10 worst efficiency weeks across all years")
     print(combined_worst_efficiency_weeks)
