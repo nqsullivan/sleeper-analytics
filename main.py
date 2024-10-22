@@ -317,47 +317,6 @@ def calculate_analytics():
 
     return statistics
 
-def visualize_data():
-    # Get the league metadata to determine how many weeks the season has
-    req = requests.get(f'https://api.sleeper.app/v1/league/{LEAGUE_ID}')
-    league_info = req.json()
-
-    # Determine the total number of weeks in the season
-    total_weeks = league_info.get('settings', {}).get('playoff_week_start', 17) - 1
-
-    # Create a figure and axis for the plot
-    fig, ax = plt.subplots()
-
-    # Create variables to store legend labels and artists
-    legend_labels = []
-    legend_artists = []
-
-    # Plot 3-week moving average for each team, removing the last week
-    for index, manager in roster_data.iterrows():
-        matchup_data_temp = matchup_data.copy()
-        matchup_data_temp = matchup_data_temp[matchup_data_temp['roster_id'] == manager['roster_id']]
-
-        # Filter out the last week (which is the last week of regular season)
-        matchup_data_temp = matchup_data_temp[matchup_data_temp['week'] != total_weeks]
-
-        # Extract data
-        x = matchup_data_temp['week']
-        y = matchup_data_temp['points']
-
-        # Calculate and plot the 3-week moving average
-        window_size = 3
-        moving_average = np.convolve(y, np.ones(window_size) / window_size, mode='valid')
-        x_ma = x[window_size - 1:]  # Adjust x values for moving average
-
-        # Round the x and y values
-        x_rounded = np.round(x_ma, 2)
-        y_rounded = np.round(moving_average, 2)
-
-        # Plot the data and store the artist
-        line, = ax.plot(x_rounded, y_rounded, label=manager['owner_id'])
-        legend_artists.append(line)
-        legend
-
 
 def calculate_worst_10_efficiency_weeks():
     # Get the league metadata to determine how many weeks the season has and extract the year
@@ -556,7 +515,6 @@ def main():
         top_10_worst_efficiency_weeks.append(calculate_worst_10_efficiency_weeks())
         top_10_worst_weeks.append(calculate_worst_10_weeks())
         top_10_best_weeks.append(calculate_best_10_weeks())
-        # visualize_data() # You can uncomment this if visualization is needed
 
     # After processing all leagues, group by owner_id to avoid duplication across leagues
     combined_team_stats = combined_team_stats.groupby('owner_id', as_index=False).agg({
